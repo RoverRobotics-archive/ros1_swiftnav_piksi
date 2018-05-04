@@ -30,7 +30,7 @@ import rospy
 
 # Initialize message and publisher structures
 
-DEFAULT_COMM_STATUS = False
+DEFAULT_COMM_STATUS = True
 NCAT_PROC = None
 RTK_ENABLE = False
 RTK_DISABLE = False
@@ -140,7 +140,7 @@ def publish_baseline_msg(msg, **metadata):
     v_accuracy = float(msg.v_accuracy)/1000
 
     if comms_disabled_msg == True:
-        rospy.logwarn_throttle(60, "SfiwtNav GPS comms are disabled")
+        rospy.logwarn_throttle(60, "SwiftNav GPS comms are disabled")
         return
     elif comms_disabled_msg == False:
         if x_pos < 5 and y_pos < 5 and x_pos > -5 and y_pos > -5:
@@ -340,7 +340,7 @@ def main():
                         rospy.loginfo("GPS tunnel running...")
                         # done setting, set the rtk_enable boolean to False
                         RTK_ENABLE=False
-                        comms_disabled_msg.data = True
+                        comms_disabled_msg.data = False
                         comms_disabled_pub.publish(comms_disabled_msg)
                 # Disable basestation communication if rtf_disable_global is TRUE
                 # Note: ncat is the linux networking tool used to tunnel the RTK data through the main PC
@@ -353,7 +353,7 @@ def main():
                         NCAT_PROC=None
                         # done setting, set the rtk_disable boolean to False
                         RTK_DISABLE=False
-                        comms_disabled_msg.data = False
+                        comms_disabled_msg.data = True
                         comms_disabled_pub.publish(comms_disabled_msg)
             	time.sleep(0.1)
             sys.exit()

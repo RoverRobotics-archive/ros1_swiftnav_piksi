@@ -1,7 +1,7 @@
 <launch>
 
     <!-- Run Swift Nav RTK GPS Node -->
-    <node pkg="goose_chaser_rover" type="swift_gps_pub.py" name="swift_nav_gps_node" >
+    <node pkg="goose_chaser_rover" type="swift_gps_tcp.py" name="swift_nav_gps_node" >
         <param name="ip_address" value="1.2.3.10" />
         <param name="tcp_port" value="55555" />
     </node>
