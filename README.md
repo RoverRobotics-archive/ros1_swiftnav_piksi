@@ -1,10 +1,10 @@
-# openrover_ros_swift_gps
+# rr_swiftnav_piksi
 ROS Package for using SwiftNav Piksi GPS  
 Currently only supports TCP (SwiftNav Piksi must be connected via ethernet cable)  
 
-## Installation
+## Install from source
 cd ~/catkin_ws/src  
-git clone https://github.com/RoverRobotics/openrover_ros_swift_gps.git  
+git clone https://github.com/RoverRobotics/rr_swiftnav_piksi.git  
 cd ~/catkin_ws  
 catkin_make  
 source devel/setup.bash 
@@ -14,7 +14,7 @@ Use the SwiftNav Console to set the IP address and TCP port
 Edit tcp_example.launch to reflect the IP address and TCP port  
 
 ## Run Example Code
-roslaunch openrover_ros_swift_gps tcp_example.launch  
+roslaunch rr_swiftnav_piksi tcp_example.launch  
 
 
 ## Published Topics:
