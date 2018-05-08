@@ -89,7 +89,7 @@ llh_fix_mode_pub = rospy.Publisher('swift_gps/llh/fix_mode', Int32, queue_size=3
 # 4 - Fixed RTk
 
 ecef_odom_msg = Odometry()
-ecef_odom_pub = rospy.Publisher('swift_gps/baseline/ecef/odom', Odometry, queue_size=3)
+ecef_odom_pub = rospy.Publisher('swift_gps/baseline/ecef/position', Odometry, queue_size=3)
 
 ecef_n_sats_msg = Int32()
 ecef_n_sats_pub = rospy.Publisher('swift_gps/baseline/ecef/n_sats', Int32, queue_size=3, latch=True)
