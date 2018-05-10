@@ -34,6 +34,8 @@ DEFAULT_COMM_STATUS = True
 NCAT_PROC = None
 RTK_ENABLE = False
 RTK_DISABLE = False
+old_x = 0
+old_y = 0
 
 # TOPIC: swift_gps/imu/raw
 # This topic publishes the current raw IMU output of the swift nav gps
@@ -149,12 +151,9 @@ def publish_baseline_msg(msg, **metadata):
 
     # Calculate the covariance from accuracy
     cov_x = h_accuracy * h_accuracy
-    #cov_x = 9*9
     cov_y = cov_x
     cov_z = v_accuracy * v_accuracy
-    #cov_x = 9
-    #cov_y = 9
-    #cov_z = 9
+
    
     # Build the ROS Odometry message
     ecef_odom_msg.child_frame_id = 'gps_link'
@@ -169,8 +168,13 @@ def publish_baseline_msg(msg, **metadata):
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0]
-    # odom_msg.pose.quaternion.w =
-    # odom_msg.pose.quaternion.z =
+    
+    angle = atan2(x_pos - old_x, y_pos - old_y)
+    ecef_odom_msg.pose.quaternion.z = 1*sin(angle/2)
+    ecef_odom_msg.pose.quaternion.w = cos(angle/2)
+
+    old_x = x_pos
+    old_y = y_pos
     
 
     # Publish topics
