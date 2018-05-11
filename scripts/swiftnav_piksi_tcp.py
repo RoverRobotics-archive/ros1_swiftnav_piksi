@@ -27,6 +27,7 @@ import struct
 import time
 import sys
 import rospy
+import numpy as np
 
 # Initialize message and publisher structures
 
@@ -125,7 +126,7 @@ def disable_comms_cb(msg):
 rtk_cmd_sub = rospy.Subscriber("swift_gps/disable_comms", Bool, disable_comms_cb)
 
 def publish_baseline_msg(msg, **metadata):
-    global comms_disabled_msg
+    global comms_disabled_msg, old_x, old_y
 
     # Publish n_sats and fix_mode
     ecef_n_sats_msg.data = msg.n_sats
@@ -169,9 +170,9 @@ def publish_baseline_msg(msg, **metadata):
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0]
     
-    angle = atan2(x_pos - old_x, y_pos - old_y)
-    ecef_odom_msg.pose.quaternion.z = 1*sin(angle/2)
-    ecef_odom_msg.pose.quaternion.w = cos(angle/2)
+    angle = np.arctan2(x_pos - old_x, y_pos - old_y)
+    ecef_odom_msg.pose.pose.orientation.z = 1*np.sin(angle/2)
+    ecef_odom_msg.pose.pose.orientation.w = np.cos(angle/2)
 
     old_x = x_pos
     old_y = y_pos
