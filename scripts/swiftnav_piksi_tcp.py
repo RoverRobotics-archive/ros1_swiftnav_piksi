@@ -28,6 +28,7 @@ import time
 import sys
 import rospy
 import numpy as np
+import math
 
 # Initialize message and publisher structures
 
@@ -162,17 +163,27 @@ def publish_baseline_msg(msg, **metadata):
     ecef_odom_msg.header.frame_id = 'map'
     ecef_odom_msg.pose.pose.position.x = x_pos
     ecef_odom_msg.pose.pose.position.y = y_pos
-    ecef_odom_msg.pose.pose.position.z = z_pos
+    ecef_odom_msg.pose.pose.position.z = 0
     ecef_odom_msg.pose.covariance = [cov_x, 0, 0, 0, 0, 0,
                                     0, cov_y, 0, 0, 0, 0,
-                                    0, 0, cov_z, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0]
-    
-    angle = np.arctan2(x_pos - old_x, y_pos - old_y)
-    ecef_odom_msg.pose.pose.orientation.z = 1*np.sin(angle/2)
-    ecef_odom_msg.pose.pose.orientation.w = np.cos(angle/2)
+    delta_x = x_pos - old_x
+    delta_y = y_pos - old_y
+    mag = np.sqrt(np.power(delta_x,2) + np.power(delta_y,2))
+    if (mag==0):
+        delta_x_hat = 0
+        delta_y_hat = 0
+    else:
+        delta_x_hat = delta_x / mag
+        delta_y_hat = delta_y / mag
+
+    if (mag>0.04):
+        angle = np.arctan2(delta_y_hat, delta_x_hat)
+        ecef_odom_msg.pose.pose.orientation.z = 1*np.sin(angle/2)
+        ecef_odom_msg.pose.pose.orientation.w = np.cos(angle/2)
 
     old_x = x_pos
     old_y = y_pos
@@ -255,8 +266,13 @@ def publish_heading_msg(msg, **metadata):
                                       0,1,0,
                                       0,0,1]
 
+    # Calculate Heading from mag_data
+    #heading = math.atan2(heading_msg.magnetic_field.y, heading_msg.magnetic_field.x)
+    #rospy.logwarn(heading)
+
     # Publish to /gps/imu/mag
     heading_pub.publish(heading_msg)
+
 
 class SettingMonitor(object):
     """Class to monitor Settings via SBP messages
