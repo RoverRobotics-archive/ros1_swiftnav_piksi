@@ -169,7 +169,7 @@ def publish_baseline_msg(msg, **metadata):
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 0, 0]
+                                    0, 0, 0, 0, 0, 0.1]
     delta_x = x_pos - old_x
     delta_y = y_pos - old_y
     mag = np.sqrt(np.power(delta_x,2) + np.power(delta_y,2))
