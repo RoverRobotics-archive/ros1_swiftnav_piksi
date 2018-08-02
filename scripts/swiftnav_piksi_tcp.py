@@ -27,6 +27,8 @@ import struct
 import time
 import sys
 import rospy
+import numpy as np
+import math
 
 # Initialize message and publisher structures
 
@@ -34,6 +36,8 @@ DEFAULT_COMM_STATUS = True
 NCAT_PROC = None
 RTK_ENABLE = False
 RTK_DISABLE = False
+old_x = 0
+old_y = 0
 
 # TOPIC: swift_gps/imu/raw
 # This topic publishes the current raw IMU output of the swift nav gps
@@ -42,8 +46,8 @@ imu_pub = rospy.Publisher('swift_gps/imu/raw', Imu, queue_size=10)
 
 # TOPIC: swift_gps/imu/mag
 # This topic puslished the current magnotometer reading of the swift nav gps
-heading_msg = MagneticField()
-heading_pub = rospy.Publisher('swift_gps/imu/mag', MagneticField, queue_size=10)
+mag_msg = MagneticField()
+mag_pub = rospy.Publisher('swift_gps/imu/mag', MagneticField, queue_size=10)
 
 # TOPIC: swift_gps/llh/position
 # This position solution message reports the absolute geodetic coordinates and the status (single point
@@ -123,7 +127,7 @@ def disable_comms_cb(msg):
 rtk_cmd_sub = rospy.Subscriber("swift_gps/disable_comms", Bool, disable_comms_cb)
 
 def publish_baseline_msg(msg, **metadata):
-    global comms_disabled_msg
+    global comms_disabled_msg, old_x, old_y
 
     # Publish n_sats and fix_mode
     ecef_n_sats_msg.data = msg.n_sats
@@ -146,15 +150,6 @@ def publish_baseline_msg(msg, **metadata):
         if x_pos < 5 and y_pos < 5 and x_pos > -5 and y_pos > -5:
             rospy.logwarn_throttle(10,"SwiftNav GPS baseline reported x=0 y=0. Message not published")
             return
-
-    # Calculate the covariance from accuracy
-    cov_x = h_accuracy * h_accuracy
-    #cov_x = 9*9
-    cov_y = cov_x
-    cov_z = v_accuracy * v_accuracy
-    #cov_x = 9
-    #cov_y = 9
-    #cov_z = 9
    
     # Build the ROS Odometry message
     ecef_odom_msg.child_frame_id = 'gps_link'
@@ -162,17 +157,56 @@ def publish_baseline_msg(msg, **metadata):
     ecef_odom_msg.header.frame_id = 'map'
     ecef_odom_msg.pose.pose.position.x = x_pos
     ecef_odom_msg.pose.pose.position.y = y_pos
-    ecef_odom_msg.pose.pose.position.z = z_pos
+    ecef_odom_msg.pose.pose.position.z = 0
+    
+    # Calculate distance travelled since last RTK measurement
+    delta_x = x_pos - old_x
+    delta_y = y_pos - old_y
+    distance_travelled = np.sqrt(np.power(delta_x,2) + np.power(delta_y,2))
+ 
+    # Normalize the orientation vector
+    if (distance_travelled==0):
+        delta_x_hat = 0
+        delta_y_hat = 0
+    else:
+        delta_x_hat = delta_x / distance_travelled
+        delta_y_hat = delta_y / distance_travelled
+
+    if (distance_travelled>0.04):
+        angle = np.arctan2(delta_y_hat, delta_x_hat)
+        ecef_odom_msg.pose.pose.orientation.z = 1*np.sin(angle/2)
+        ecef_odom_msg.pose.pose.orientation.w = np.cos(angle/2)
+
+    # Update the old positions
+    old_x = x_pos
+    old_y = y_pos
+    
+    # Calculate the position covariances using the accuracy reported by the Piksi
+    cov_x = h_accuracy
+    cov_y = cov_x
+
+    # Calculate the orientation covariance, the further we have moved the more accurate orientation is
+    if (0<=distance_travelled and distance_travelled<=0.04):
+        theta_accuracy = 10
+    elif(0.04<distance_travelled and distance_travelled<=0.01):
+        theta_accuracy = 0.348
+    elif(0.01<distance_travelled and distance_travelled<=0.4):
+        theta_accuracy = 0.174
+    elif(0.4<distance_travelled):
+        theta_accuracy = 0.14
+    else:
+        theta_accuracy = -1
+        rospy.logerr_throttle(5,"distance travelled was negative")
+
+
+    cov_theta = theta_accuracy
+
     ecef_odom_msg.pose.covariance = [cov_x, 0, 0, 0, 0, 0,
                                     0, cov_y, 0, 0, 0, 0,
-                                    0, 0, cov_z, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
                                     0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 0, 0]
-    # odom_msg.pose.quaternion.w =
-    # odom_msg.pose.quaternion.z =
-    
-
+                                    0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, cov_theta]
     # Publish topics
     ecef_odom_pub.publish(ecef_odom_msg)
 
@@ -197,12 +231,12 @@ def publish_imu_msg(msg, **metadata):
     imu_msg.orientation_covariance = [0,0,0,
                                       0,0,0,
                                       0,0,0]
-    imu_msg.angular_velocity_covariance= [1,0,0,
-                                      0,1,0,
-                                      0,0,1]
-    imu_msg.linear_acceleration_covariance= [1,0,0,
-                                      0,1,0,
-                                      0,0,1]
+    imu_msg.angular_velocity_covariance= [0.01,0,0,
+                                          0,0.01,0,
+                                          0,0,0.01]
+    imu_msg.linear_acceleration_covariance= [0.01,0,0,
+                                             0,0.01,0,
+                                             0,0,0.01]
 
     # Publish to /gps/imu/raw
     imu_pub.publish(imu_msg)
@@ -214,12 +248,9 @@ def publish_llh_msg(msg, **metadata):
     llh_msg.longitude = msg.lon
     llh_msg.altitude = msg.height
     llh_msg.position_covariance_type = 2
-    #llh_msg.position_covariance = [pow(float(msg.h_accuracy)/1000,2),0,0,
-    #                                  0,pow(float(msg.h_accuracy)/1000,2),0,
-    #                                  0,0,pow(float(msg.v_accuracy)/1000,2)]
-    llh_msg.position_covariance = [pow(3,2),0,0,
-                                      0,pow(3,2),0,
-                                      0,0,pow(3,2)]
+    llh_msg.position_covariance = [9,0,0,
+                                   0,9,0,
+                                   0,0,9]
     llh_n_sats_msg = msg.n_sats
     llh_fix_mode_msg = msg.flags
 
@@ -230,28 +261,24 @@ def publish_llh_msg(msg, **metadata):
 
 
 
-def publish_heading_msg(msg, **metadata):
-    heading_msg.header.stamp = rospy.Time.now()
-    heading_msg.header.frame_id = 'gps_link'
+def publish_mag_msg(msg, **metadata):
+    mag_msg.header.stamp = rospy.Time.now()
+    mag_msg.header.frame_id = 'gps_link'
     # should be in Tesla - chip stores data in two's complement 13-bits data
     # according to /usr/local/lib/python2.7/dist-packages/sbp/mag.py swiftnav does not do anything special to it
     # according to Bosch's datasheet, output is scaled by 16, so divide by 16 to get to uTesla
     # and divide further by 100 so it is in Gauss
     mscale=0.01/16
-    # -0.15833344 0.06957173 0.15392401
-    # 24.84406845 22.90925231 149.02582974
-    #heading_msg.magnetic_field.x = (msg.mag_x*mscale + 0.15833344)*24.84406845
-    #heading_msg.magnetic_field.y = (msg.mag_y*mscale - 0.06957173)*22.90925231
-    #heading_msg.magnetic_field.z = (msg.mag_z*mscale - 0.15392401)*20
-    heading_msg.magnetic_field.x = (msg.mag_x*mscale)
-    heading_msg.magnetic_field.y = (msg.mag_y*mscale)
-    heading_msg.magnetic_field.z = (msg.mag_z*mscale)
-    heading_msg.magnetic_field_covariance= [1,0,0,
+    mag_msg.magnetic_field.x = (msg.mag_x*mscale)
+    mag_msg.magnetic_field.y = (msg.mag_y*mscale)
+    mag_msg.magnetic_field.z = (msg.mag_z*mscale)
+    mag__msg.magnetic_field_covariance= [1,0,0,
                                       0,1,0,
                                       0,0,1]
 
     # Publish to /gps/imu/mag
-    heading_pub.publish(heading_msg)
+    mag_pub.publish(mag_msg)
+
 
 class SettingMonitor(object):
     """Class to monitor Settings via SBP messages
@@ -321,7 +348,7 @@ def main():
             source.add_callback(sbp_print_setting, SBP_MSG_SETTINGS_READ_RESP)
             source.add_callback(publish_baseline_msg, SBP_MSG_BASELINE_NED)
             source.add_callback(publish_imu_msg,SBP_MSG_IMU_RAW)
-            source.add_callback(publish_heading_msg,SBP_MSG_MAG_RAW)
+            #source.add_callback(publish_mag_msg,SBP_MSG_MAG_RAW)
             source.add_callback(publish_llh_msg,SBP_MSG_POS_LLH)
             source.start
 
