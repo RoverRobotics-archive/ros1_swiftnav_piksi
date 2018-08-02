@@ -5,7 +5,7 @@
   <description>Rover Robotics: ROS package for connecting to SwiftNav Piksi</description>
 
 
-  <maintainer email="nick@roverrobotics.com">nick fragale</maintainer>
+  <maintainer email="nick@roverrobotics.com">Nick Fragale</maintainer>
   <license>BSD</license>
   <url type="website">http://wiki.ros.org/rr_swiftnav_piksi</url> -->
 
