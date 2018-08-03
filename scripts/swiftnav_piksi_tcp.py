@@ -143,11 +143,12 @@ def publish_baseline_msg(msg, **metadata):
     h_accuracy = float(msg.h_accuracy)/1000
     v_accuracy = float(msg.v_accuracy)/1000
 
-    if comms_disabled_msg == True:
+
+    if comms_disabled_msg.data:
         rospy.logwarn_throttle(60, "SwiftNav GPS comms are disabled")
         return
-    elif comms_disabled_msg == False:
-        if x_pos < 5 and y_pos < 5 and x_pos > -5 and y_pos > -5:
+    else:
+        if x_pos == 0.0 and y_pos == 0.0:
             rospy.logwarn_throttle(10,"SwiftNav GPS baseline reported x=0 y=0. Message not published")
             return
    
