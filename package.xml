@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>rr_swiftnav_piksi</name>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <description>Rover Robotics: ROS package for connecting to SwiftNav Piksi</description>
 
 
