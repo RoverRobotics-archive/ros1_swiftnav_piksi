@@ -188,7 +188,7 @@ def publish_baseline_msg(msg, **metadata):
 
     # Calculate the orientation covariance, the further we have moved the more accurate orientation is
     if (0<=distance_travelled and distance_travelled<=0.04):
-        theta_accuracy = 10
+        theta_accuracy = 1000
     elif(0.04<distance_travelled and distance_travelled<=0.01):
         theta_accuracy = 0.348
     elif(0.01<distance_travelled and distance_travelled<=0.4):
@@ -245,6 +245,8 @@ def publish_imu_msg(msg, **metadata):
 
 
 def publish_llh_msg(msg, **metadata):
+    # note there was no time update in the llh_msg
+    #llh_msg.header.stamp = rospy.Time.now()
     llh_msg.latitude = msg.lat
     llh_msg.longitude = msg.lon
     llh_msg.altitude = msg.height
