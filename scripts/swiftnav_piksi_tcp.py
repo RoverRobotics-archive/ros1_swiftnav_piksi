@@ -2,27 +2,17 @@
 
 from sbp.client.drivers.network_drivers import TCPDriver
 from sbp.client import Handler, Framer
-from sbp.settings import MsgSettingsWrite, MsgSettingsReadReq
-from sbp.settings import SBP_MSG_SETTINGS_READ_RESP
-
-from sbp.navigation import SBP_MSG_BASELINE_NED
+from sbp.settings import SBP_MSG_SETTINGS_READ_RESP, MsgSettingsWrite, MsgSettingsReadReq
 from sbp.imu import SBP_MSG_IMU_RAW
 from sbp.mag import SBP_MSG_MAG_RAW
-from sbp.navigation import SBP_MSG_BASELINE_HEADING_DEP_A
-from sbp.navigation import SBP_MSG_POS_LLH
-
+from sbp.navigation import SBP_MSG_BASELINE_HEADING_DEP_A, SBP_MSG_POS_LLH, SBP_MSG_BASELINE_NED
 from datetime import datetime
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Imu
-from sensor_msgs.msg import MagneticField 
-from sensor_msgs.msg import NavSatFix
-from std_msgs.msg import String
-from std_msgs.msg import Int32
-from std_msgs.msg import Bool
-
+from sensor_msgs.msg import Imu, MagneticField, NavSatFix
+from std_msgs.msg import String, Int32, Bool
+from geometry_msgs.msg import TwistStamped
 import subprocess
 import os
-
 import struct
 import time
 import sys
@@ -31,7 +21,7 @@ import numpy as np
 import math
 
 # Initialize message and publisher structures
-
+DRIVE_DIRECTION = "forward"
 DEFAULT_COMM_STATUS = True
 NCAT_PROC = None
 RTK_ENABLE = True 
@@ -128,6 +118,7 @@ rtk_cmd_sub = rospy.Subscriber("swift_gps/disable_comms", Bool, disable_comms_cb
 
 def publish_baseline_msg(msg, **metadata):
     global comms_disabled_msg, old_x, old_y
+    global DRIVE_DIRECTION
 
     # Publish n_sats and fix_mode
     ecef_n_sats_msg.data = msg.n_sats
@@ -161,8 +152,13 @@ def publish_baseline_msg(msg, **metadata):
     ecef_odom_msg.pose.pose.position.z = 0
     
     # Calculate distance travelled since last RTK measurement
-    delta_x = x_pos - old_x
-    delta_y = y_pos - old_y
+    if DRIVE_DIRECTION=="forward":
+        delta_x = x_pos - old_x
+        delta_y = y_pos - old_y
+    if DRIVE_DIRECTION=="backward":
+        delta_x = old_x - x_pos
+        delta_y = old_y - y_pos
+
     distance_travelled = np.sqrt(np.power(delta_x,2) + np.power(delta_y,2))
  
     # Normalize the orientation vector
@@ -333,6 +329,13 @@ class SettingMonitor(object):
 def sbp_print_setting(sbp_msg, **metadata):
     print sbp_msg
 
+def cmd_vel_cb(cmd_vel):
+    global DRIVE_DIRECTION
+    if cmd_vel.twist.linear.x >= 0:
+        DRIVE_DIRECTION = "forward"
+    if cmd_vel.twist.linear.x < 0:
+        DRIVE_DIRECTION = "reverse"
+
 def main():
     global RTK_ENABLE, RTK_DISABLE, NCAT_PROC, DEFAULT_COMM_STATUS
     global comms_disabled_msg
@@ -355,7 +358,8 @@ def main():
             source.add_callback(publish_llh_msg,SBP_MSG_POS_LLH)
             source.start
 
-            
+            cmd_vel_sub = rospy.Subscriber("/cmd_vel/managed", TwistStamped, cmd_vel_cb)            
+
             # we leave the swiftnav tcp_client0 on all the time, but pointing to 1.2.3.55:55555 and only start the ncat forwarder when it is needed
             comms_disabled_msg.data = DEFAULT_COMM_STATUS
             comms_disabled_pub.publish(comms_disabled_msg)
