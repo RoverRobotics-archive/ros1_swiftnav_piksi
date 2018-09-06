@@ -32,7 +32,7 @@ import math
 
 # Initialize message and publisher structures
 
-DEFAULT_COMM_STATUS = False
+DEFAULT_COMM_STATUS = True
 NCAT_PROC = None
 RTK_ENABLE = True 
 RTK_DISABLE = False
