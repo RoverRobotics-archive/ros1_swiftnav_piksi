@@ -155,7 +155,7 @@ def publish_baseline_msg(msg, **metadata):
     if DRIVE_DIRECTION=="forward":
         delta_x = x_pos - old_x
         delta_y = y_pos - old_y
-    if DRIVE_DIRECTION=="backward":
+    if DRIVE_DIRECTION=="reverse":
         delta_x = old_x - x_pos
         delta_y = old_y - y_pos
 
@@ -331,7 +331,7 @@ def sbp_print_setting(sbp_msg, **metadata):
 
 def cmd_vel_cb(cmd_vel):
     global DRIVE_DIRECTION
-    if cmd_vel.twist.linear.x >= 0:
+    if cmd_vel.twist.linear.x > 0:
         DRIVE_DIRECTION = "forward"
     if cmd_vel.twist.linear.x < 0:
         DRIVE_DIRECTION = "reverse"
