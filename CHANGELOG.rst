@@ -12,3 +12,6 @@ Changelog for package rr_swiftnav_piksi
 0.0.3 (9-7-2018)
 -------------------
 * add logic to keep heading while driving backwards
+0.1.0 (9-8-2018)
+-------------------
+* fix broken ros params
