@@ -53,11 +53,30 @@ class SwiftNavDriver(object):
         self.sub_cmd_vel = rospy.Subscriber("/cmd_vel/managed", TwistStamped, self.cmd_vel_cb)            
 
         # ROS Parameters
-        ipaddr = rospy.get_param('default_param', '1.2.3.10')
-        tcp_port = rospy.get_param('default_param', '55555')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Loading ROS Parameters")
+
+        path_piksi_ip_address = rospy.search_param('piksi_ip_address')
+        self.piksi_ip_address = rospy.get_param(path_piksi_ip_address, '1.2.3.10')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Piksi IP address: %s", self.piksi_ip_address)
+
+        path_piksi_port = rospy.search_param('piksi_port')
+        self.piksi_port = rospy.get_param(path_piksi_port, '55555')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Piksi Port: %s", self.piksi_port)
+
+        path_base_station_ip_address = rospy.search_param('base_station_ip_address')
+        self.base_station_ip_address = rospy.get_param(path_base_station_ip_address, '111.111.111.111')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Base Station IP address: %s", self.base_station_ip_address)
+
+        path_base_station_port = rospy.search_param('base_station_port')
+        self.base_station_port = rospy.get_param(path_base_station_port, '55555')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Base Station Port: %s", self.base_station_port)
+
+        path_computer_ip_address = rospy.search_param('computer_ip_address')
+        self.computer_ip_address = rospy.get_param(path_computer_ip_address, '1.2.3.55')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Computer IP address: %s", self.computer_ip_address)
 
         # Create SwiftNav Callbacks
-        with TCPDriver(ipaddr, tcp_port) as driver:
+        with TCPDriver(self.piksi_ip_address, self.piksi_port) as driver:
             with Handler(Framer(driver.read, driver.write)) as source:
                 driver.flush()
                 time.sleep(2)
@@ -80,7 +99,9 @@ class SwiftNavDriver(object):
         if (msg.data == True):
 	    # Note: ncat is the linux networking tool used to tunnel the RTK data through the main PC
 	    if (self.ncat_process is None):
-	        self.ncat_process = subprocess.Popen('/usr/bin/ncat -l 1.2.3.55 55555 --sh-exec "/usr/bin/ncat 65.132.94.146 55555"', shell=True)
+                str_cmd = '/usr/bin/ncat -l ' + str(self.computer_ip_address) + ' ' + str(self.piksi_port) + ' --sh-exec "/usr/bin/ncat ' + str(self.base_station_ip_address) + ' ' + str(self.base_station_port) + '"'
+                rospy.loginfo(str_cmd)
+	        self.ncat_process = subprocess.Popen(str_cmd, shell=True)
                 self.comms_enabled = True
                 rospy.loginfo("[RR_SWIFNAV_PIKSI] GPS comms enabled, ncat started")
 	    else:
