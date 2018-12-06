@@ -34,22 +34,22 @@ class SwiftNavDriver(object):
         # TOPIC: swift_gps/llh/fix_mode
         # This topic reports the fix_mode of llh position
         # 0 - Invalid 
-	# 1 - Single Point Position (SSP)
-	# 2 - Differential GNSS (DGNSS)
-	# 3 - Float RTK
-	# 4 - Fixed RTK
-	# 5 - Dead Reckoning
+        # 1 - Single Point Position (SSP)
+        # 2 - Differential GNSS (DGNSS)
+        # 3 - Float RTK
+        # 4 - Fixed RTK
+        # 5 - Dead Reckoning
         # 6 - Satellite-based Augmentation System (SBAS)
 
-	# ROS Publishers
-	self.pub_imu = rospy.Publisher('/swift_gps/imu/raw', Imu, queue_size=10)
-	self.pub_llh = rospy.Publisher('/swift_gps/llh/position', NavSatFix, queue_size=3)
-	self.pub_llh_n_sats = rospy.Publisher('/swift_gps/llh/n_sats', Int32, queue_size=3)
-	self.pub_llh_fix_mode = rospy.Publisher('/swift_gps/llh/fix_mode', Int32, queue_size=3)
-	self.pub_ecef_odom = rospy.Publisher('/swift_gps/baseline/ecef/position', Odometry, queue_size=3)
+        # ROS Publishers
+        self.pub_imu = rospy.Publisher('/swift_gps/imu/raw', Imu, queue_size=10)
+        self.pub_llh = rospy.Publisher('/swift_gps/llh/position', NavSatFix, queue_size=3)
+        self.pub_llh_n_sats = rospy.Publisher('/swift_gps/llh/n_sats', Int32, queue_size=3)
+        self.pub_llh_fix_mode = rospy.Publisher('/swift_gps/llh/fix_mode', Int32, queue_size=3)
+        self.pub_ecef_odom = rospy.Publisher('/swift_gps/baseline/ecef/position', Odometry, queue_size=3)
 
-	# ROS Subscriber
-	self.sub_rtk_cmd = rospy.Subscriber("/swift_gps/enable_comms", Bool, self.enable_comms_cb)
+        # ROS Subscriber
+        self.sub_rtk_cmd = rospy.Subscriber("/swift_gps/enable_comms", Bool, self.enable_comms_cb)
         self.sub_cmd_vel = rospy.Subscriber("/cmd_vel/managed", TwistStamped, self.cmd_vel_cb)            
 
         # ROS Parameters
@@ -75,6 +75,15 @@ class SwiftNavDriver(object):
         self.computer_ip_address = rospy.get_param(path_computer_ip_address, '1.2.3.55')
         rospy.loginfo("[RR_SWIFTNAV_PIKSI] Computer IP address: %s", self.computer_ip_address)
 
+        path_gyro_cov = rospy.search_param('gyro_cov')
+        self.gyro_cov = rospy.get_param(path_gyro_cov, '1.29e-7')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Gyro Cov: %s", self.gyro_cov)
+
+        path_accel_cov = rospy.search_param('accel_cov')
+        self.accel_cov = rospy.get_param(path_accel_cov, '3.34e-5')
+        rospy.loginfo("[RR_SWIFTNAV_PIKSI] Accel Cov: %s", self.accel_cov)
+
+
         # Create SwiftNav Callbacks
         with TCPDriver(self.piksi_ip_address, self.piksi_port) as driver:
             with Handler(Framer(driver.read, driver.write)) as source:
@@ -97,25 +106,25 @@ class SwiftNavDriver(object):
 
     def enable_comms_cb(self, msg):
         if (msg.data == True):
-	    # Note: ncat is the linux networking tool used to tunnel the RTK data through the main PC
-	    if (self.ncat_process is None):
+            # Note: ncat is the linux networking tool used to tunnel the RTK data through the main PC
+            if (self.ncat_process is None):
                 str_cmd = '/usr/bin/ncat -l ' + str(self.computer_ip_address) + ' ' + str(self.piksi_port) + ' --sh-exec "/usr/bin/ncat ' + str(self.base_station_ip_address) + ' ' + str(self.base_station_port) + '"'
                 rospy.loginfo(str_cmd)
-	        self.ncat_process = subprocess.Popen(str_cmd, shell=True)
+                self.ncat_process = subprocess.Popen(str_cmd, shell=True)
                 self.comms_enabled = True
                 rospy.loginfo("[RR_SWIFNAV_PIKSI] GPS comms enabled, ncat started")
-	    else:
-	        rospy.logwarn("[RR_SWIFTNAV_PIKSI] GPS comms already enabled, ignoring request")
+            else:
+                rospy.logwarn("[RR_SWIFTNAV_PIKSI] GPS comms already enabled, ignoring request")
         if (msg.data == False):
-	    if (self.ncat_process is not None):
-	        subprocess.call(["kill", "-9", "%d" % self.ncat_process.pid])
-	        self.ncat_process.wait()
-	        os.system('killall ncat')
+            if (self.ncat_process is not None):
+                subprocess.call(["kill", "-9", "%d" % self.ncat_process.pid])
+                self.ncat_process.wait()
+                os.system('killall ncat')
                 rospy.loginfo("[RR_SWIFT_NAV_PIKSI] GPS comms disables, ncat stopped")
                 self.comms_enabled = False
-	        self.ncat_process=None
-	    else:
-	        rospy.logwarn("[RR_SWIFTNAV_PIKSI] RTK GPS already disabled, ignoring request")
+                self.ncat_process=None
+            else:
+                rospy.logwarn("[RR_SWIFTNAV_PIKSI] RTK GPS already disabled, ignoring request")
 
     def publish_baseline_msg(self, msg, **metadata):
         if not self.comms_enabled:
@@ -210,12 +219,13 @@ class SwiftNavDriver(object):
         imu_msg.orientation_covariance = [0,0,0,
                                           0,0,0,
                                           0,0,0]
-        imu_msg.angular_velocity_covariance= [0,0,0,
-                                              0,0,0,
-                                              0,0,0.01]
-        imu_msg.linear_acceleration_covariance= [0.01,0,0,
-                                                 0,0.01,0,
-                                                 0,0,0.01]
+
+        imu_msg.angular_velocity_covariance= [self.gyro_cov, 0, 0,
+                                              0, self.gyro_cov, 0,
+                                              0, 0, self.gyro_cov]
+        imu_msg.linear_acceleration_covariance= [self.accel_cov, 0, 0,
+                                                 0, self.accel_cov, 0,
+                                                 0, 0, self.accel_cov]
         # Publish to /gps/imu/raw
         self.pub_imu.publish(imu_msg)
 
